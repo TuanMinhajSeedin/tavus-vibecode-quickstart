@@ -1,4 +1,5 @@
 import { createConversation } from "@/api";
+import { validateApiToken } from "@/api";
 import {
   DialogWrapper,
   AnimatedTextBlockWrapper,
@@ -28,15 +29,31 @@ const useCreateConversationMutation = () => {
   const token = useAtomValue(apiTokenAtom);
 
   const createConversationRequest = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       if (!token) {
         throw new Error("Token is required");
       }
+      
+      // Validate token first
+      console.log('Validating API token...');
+      const validation = await validateApiToken(token);
+      if (!validation.valid) {
+        throw new Error(validation.error || 'Invalid API token');
+      }
+      console.log('API token is valid');
+      
+      console.log('Starting conversation creation...');
       const conversation = await createConversation(token);
+      console.log('Conversation created successfully:', conversation);
       setConversation(conversation);
       setScreenState({ currentScreen: "conversation" });
     } catch (error) {
-      setError(error as string);
+      console.error('Conversation creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +69,7 @@ const useCreateConversationMutation = () => {
 export const Instructions: React.FC = () => {
   const daily = useDaily();
   const { currentMic, setMicrophone, setSpeaker } = useDevices();
-  const { createConversationRequest } = useCreateConversationMutation();
+  const { createConversationRequest, error: conversationError } = useCreateConversationMutation();
   const [getUserMediaError, setGetUserMediaError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
@@ -201,6 +218,12 @@ export const Instructions: React.FC = () => {
                 To chat with the AI, please allow microphone access. Check your
                 browser settings.
               </p>
+            </div>
+          )}
+          {conversationError && (
+            <div className="absolute -bottom-16 left-0 right-0 flex items-center gap-1 text-wrap rounded-lg border bg-red-500 p-2 text-white backdrop-blur-sm">
+              <AlertTriangle className="text-red size-4" />
+              <p>{conversationError}</p>
             </div>
           )}
         </Button>
